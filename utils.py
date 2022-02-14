@@ -11,17 +11,17 @@ class ShuffledDataset():
     def __init__(self, dataset_name, root, shuffle_percentage, train=True, download=True, transform=transforms.ToTensor()):
         """
         Input:
-        dataset_name: 
+        dataset_name
             string of desired dataset name
-        root: 
+        root
             string of data download destination
-        shuffle_percentage: 
+        shuffle_percentage
             float between [0, 1] to specify what fraction of train data to have incorrect labels
-        train:
+        train
             bool to specify wheter the dataset is for train or test
-        download:
+        download
             bool to specify whether to download the dataset specified by dataset_name
-        transform:
+        transform
             operations to perform transformation on the dataset
         """
         if dataset_name == "CIFAR10":
@@ -43,7 +43,7 @@ class ShuffledDataset():
     def _create_shuffle_mapping(self, indices):
         """
         Input:
-        indices:
+        indices
             list of int to specify which samples to shuffle label
         """
         self.mapping = {}
@@ -66,48 +66,73 @@ class ShuffledDataset():
         return len(self.dataset)
 
 
-def eval(model, test_dl, device):
+def eval(model, test_dataloader, device):
+    """
+    Input:
+    model
+        pytorch model object to eval
+    test_dataloader
+        pytorch dataloader
+    device
+        string of either 'cuda' or 'cpu'
+    
+    Return:
+        float accuracy on the validation set
+    """
     match_count, total_count = 0, 0
-    for (X, y) in test_dl:
+    for (X, y) in test_dataloader:
         X, y = X.to(device), y.to(device)
         logits = model(X)
-        softmax = nn.Softmax(dim=1)
-        soft_probs = softmax(logits)
-        match_count += torch.sum(torch.argmax(soft_probs, dim=1) == y)
+        match_count += torch.sum(torch.argmax(logits, dim=1) == y)
         total_count += len(X)
 
     return match_count / total_count
 
-def train(model, epoch, train_dl, test_dl, device):
-    # Important! Set the reduction to be None which allows single sample loss recording
-    #criterion = nn.CrossEntropyLoss(reduction='none')
-    criterion = nn.CrossEntropyLoss()
-    opt = torch.optim.Adam(model.parameters(), lr=Config.LR)
 
-    feed_indices = torch.randperm(len(train_dl)).tolist()
-    shuffled_dataset = Subset(train_dl, feed_indices)
-    dataloader = DataLoader(shuffled_dataset, batch_size=Config.BATCH_SIZE, shuffle=False)
+def train(model, epoch, train_dataset, test_dataloader, device):
+    """
+    Input:
+    model
+        pytorch model object to train
+    epoch
+        int number of total training epochs
+    train_dataset
+        dataset object which satisfies pytorch dataset format
+    test_dataloader
+        pytorch dataloader
+    device
+        string of either 'cuda' or 'cpu'
+    """
+    model.train()
+
+    # Important! Set the reduction to be None which allows single sample loss recording
+    criterion = nn.CrossEntropyLoss(reduction='none')
+    opt = torch.optim.Adam(model.parameters(), lr=Config.LR)
 
     for e in range(epoch):
         train_loss = 0
+
+        # Manually shuffle the training dataset for loss recoding later
+        feed_indices = torch.randperm(len(train_dataset)).tolist()
+        shuffled_dataset = Subset(train_dataset, feed_indices)
+        dataloader = DataLoader(shuffled_dataset, batch_size=Config.BATCH_SIZE, shuffle=False)
 
         for (X, y) in dataloader:
             X, y = X.to(device), y.to(device)
             opt.zero_grad()
             logits = model(X)
-            #loss_list = criterion(logits, y)
+            loss_list = criterion(logits, y)
 
-            #loss_reduced = torch.mean(loss_list)
-            #loss_reduced.backward()
-            loss_reduced = criterion(logits, y)
+            loss_reduced = torch.mean(loss_list)
+            loss_reduced.backward()
             opt.step()
 
             train_loss += loss_reduced.item()
         
-        print("Epoch {} - Training loss: {}".format(e, train_loss/len(train_dl)))
+        print("Epoch {} - Training loss: {}".format(e, train_loss/len(test_dataloader)))
         
         if (1 + e) % Config.EVAL_INTERVAL == 0:
-            validation_accuracy = eval(model, test_dl, device)
+            validation_accuracy = eval(model, test_dataloader, device)
             print(f"Test accuracy at epoch {e}: {validation_accuracy:.4f}")
     
     print("Training Finished...")

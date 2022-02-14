@@ -39,4 +39,5 @@ class ShuffledDataset():
     def get_shuffle_mapping(self):
         return self.mapping
 
-
+    def __len__(self):
+        return len(self.dataset)

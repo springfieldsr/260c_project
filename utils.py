@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Subset
 from config import Config
 
 class ShuffledDataset():
-    def __init__(self, dataset_name, root, shuffle_percentage, train=True, download=True, transform=transforms.ToTensor()):
+    def __init__(self, dataset_name, root, shuffle_percentage, transform=None, train=True, download=True):
         """
         Input:
         dataset_name
@@ -38,7 +38,6 @@ class ShuffledDataset():
         dataset_len = len(self.dataset)
         indices_to_shuffle = random.sample(range(dataset_len), int(percentage * dataset_len))
         self._create_shuffle_mapping(indices_to_shuffle)
-    
 
     def _create_shuffle_mapping(self, indices):
         """
@@ -112,7 +111,7 @@ def train(model, epoch, train_dataset, test_dataloader, device):
     for e in range(epoch):
         train_loss = 0
 
-        # Manually shuffle the training dataset for loss recoding later
+        # Manually shuffle the training dataset for loss recording later
         feed_indices = torch.randperm(len(train_dataset)).tolist()
         shuffled_dataset = Subset(train_dataset, feed_indices)
         dataloader = DataLoader(shuffled_dataset, batch_size=Config.BATCH_SIZE, shuffle=False)

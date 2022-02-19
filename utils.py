@@ -88,7 +88,7 @@ def eval(model, test_dataloader, device):
 
     match_count, total_count = 0, 0
     for (X, y) in test_dataloader:
-        with torch.no_grad:
+        with torch.no_grad():
             X, y = X.to(device), y.to(device)
             logits = model(X)
             match_count += torch.sum(torch.argmax(logits, dim=1) == y)

@@ -129,7 +129,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-results/*
+results/
 
 tmp.py
 standard_training.py

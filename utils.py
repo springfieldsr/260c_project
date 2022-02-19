@@ -84,12 +84,15 @@ def eval(model, test_dataloader, device):
     Return:
         float accuracy on the validation set
     """
+    model.eval()
+
     match_count, total_count = 0, 0
     for (X, y) in test_dataloader:
-        X, y = X.to(device), y.to(device)
-        logits = model(X)
-        match_count += torch.sum(torch.argmax(logits, dim=1) == y)
-        total_count += len(X)
+        with torch.no_grad:
+            X, y = X.to(device), y.to(device)
+            logits = model(X)
+            match_count += torch.sum(torch.argmax(logits, dim=1) == y)
+            total_count += len(X)
 
     return match_count / total_count
 
@@ -108,13 +111,14 @@ def train(model, epoch, train_dataset, test_dataloader, device, args):
     device
         string of either 'cuda' or 'cpu'
     """
-    model.train()
 
     # Important! Set the reduction to be None which allows single sample loss recording
     criterion = nn.CrossEntropyLoss(reduction='none')
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     for e in range(epoch):
+        model.train()
+
         train_loss = 0
         batch_size = args.batch_size # TODO: this will modified by new methods later
         # Manually shuffle the training dataset for loss recording later
@@ -154,8 +158,11 @@ def SaveEnvironment():
 
 def GenerateEnvironment(args):
     seeds = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
-    expr_path = path.join('./results',seeds)
-    args_path = path.join(expr_path,'args.txt')
+    result_dir = './results'
+    if not path.isdir(result_dir):
+        os.mkdir(result_dir)
+    expr_path = path.join(result_dir,seeds).replace("\\","/")
+    args_path = path.join(expr_path,'args.txt').replace("\\","/")
     os.mkdir(expr_path)
     print('Create enviornment at : {}'.format(expr_path))
     with open(args_path,'w') as F:

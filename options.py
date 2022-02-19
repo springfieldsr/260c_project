@@ -18,5 +18,8 @@ def Options():
     parser.add_argument('--lr',dest='lr',
                     default=1e-2,type=float,
                     help='learning rate')
+    parser.add_argument('--sp',dest='shuffle_percentage',
+                    default=0.05,type=float,
+                    help='percentage of training sample to shuffle labels')
     args = parser.parse_args()
     return args

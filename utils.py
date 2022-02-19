@@ -3,9 +3,15 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
-
+import tqdm
+import random
+import string
+import os
+import json
+from os import path
 from torch.utils.data import DataLoader, Subset
-from config import Config
+from const import EVAL_INTERVAL
+# from config import Config
 
 class ShuffledDataset():
     def __init__(self, dataset_name, root, shuffle_percentage, transform=None, train=True, download=True):
@@ -32,7 +38,7 @@ class ShuffledDataset():
             self.label_len = 100
         else:
             raise NotImplementedError
-        
+
         # Force the test set to be intact
         percentage = train * shuffle_percentage
         dataset_len = len(self.dataset)
@@ -57,7 +63,7 @@ class ShuffledDataset():
         sample, label = self.dataset[index]
         label = self.mapping.get(index, label)
         return (sample, label)
-    
+
     def get_shuffle_mapping(self):
         return self.mapping
 
@@ -88,7 +94,7 @@ def eval(model, test_dataloader, device):
     return match_count / total_count
 
 
-def train(model, epoch, train_dataset, test_dataloader, device):
+def train(model, epoch, train_dataset, test_dataloader, device, args):
     """
     Input:
     model
@@ -106,32 +112,59 @@ def train(model, epoch, train_dataset, test_dataloader, device):
 
     # Important! Set the reduction to be None which allows single sample loss recording
     criterion = nn.CrossEntropyLoss(reduction='none')
-    opt = torch.optim.Adam(model.parameters(), lr=Config.LR)
+    opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     for e in range(epoch):
         train_loss = 0
-
+        batch_size = args.batch_size # TODO: this will modified by new methods later
         # Manually shuffle the training dataset for loss recording later
         feed_indices = torch.randperm(len(train_dataset)).tolist()
         shuffled_dataset = Subset(train_dataset, feed_indices)
-        dataloader = DataLoader(shuffled_dataset, batch_size=Config.BATCH_SIZE, shuffle=False)
+        dataloader = DataLoader(shuffled_dataset, batch_size, shuffle=False)
 
-        for (X, y) in dataloader:
-            X, y = X.to(device), y.to(device)
-            opt.zero_grad()
-            logits = model(X)
-            loss_list = criterion(logits, y)
+        with tqdm.tqdm(total=len(dataloader)*batch_size, unit='it', unit_scale=True, unit_divisor=1000) as pbar:
+            sum_acc = 0
+            for step, (X, y) in enumerate(dataloader):
+                X, y = X.to(device), y.to(device)
+                opt.zero_grad()
+                logits = model(X)
+                loss_list = criterion(logits, y)
+                acc = torch.sum(torch.argmax(logits, dim=1) == y).item()
+                loss_reduced = torch.mean(loss_list)
+                loss_reduced.backward()
+                opt.step()
 
-            loss_reduced = torch.mean(loss_list)
-            loss_reduced.backward()
-            opt.step()
-
-            train_loss += loss_reduced.item()
-        
-        print("Epoch {} - Training loss: {}".format(e, train_loss/len(test_dataloader)))
-        
-        if (1 + e) % Config.EVAL_INTERVAL == 0:
+                # progress bar counter
+                train_loss += loss_reduced.item()
+                pbar.update(batch_size)
+                sum_acc += acc
+                pbar.set_postfix(loss=loss_reduced.item(),
+                                     acc=sum_acc/((step+1)))
+        print("Epoch {} - Training loss: {}".format(e, train_loss/len(dataloader)))
+        if (1 + e) % EVAL_INTERVAL == 0:
             validation_accuracy = eval(model, test_dataloader, device)
             print(f"Test accuracy at epoch {e}: {validation_accuracy:.4f}")
-    
     print("Training Finished...")
+
+
+
+def SaveEnvironment():
+
+    pass
+
+def GenerateEnvironment(args):
+    seeds = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    expr_path = path.join('./results',seeds)
+    args_path = path.join(expr_path,'args.txt')
+    os.mkdir(expr_path)
+    print('Create enviornment at : {}'.format(expr_path))
+    with open(args_path,'w') as F:
+        DumpOptionsToFile(args, F)
+
+def DumpOptionsToFile(args,fp):
+    d = vars(args)
+    for key,value in d.items():
+        if type(value) == str:
+            fp.write('{} = "{}"\n'.format(key,value))
+        else:
+            fp.write('{} = {}\n'.format(key,value))

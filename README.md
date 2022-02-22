@@ -35,7 +35,9 @@ python NoisyDetection.py
 ### Help
 
 ```bash
-usage: NoisyDetection.py [-h] [--datasets {CIFAR10,CIFAR100}] [--models {resnet18,}] [--bs {1,4,16,64,256,1024}] [--epochs EPOCHS] [--lr LR]
+usage: NoisyDetection.py [-h] [--datasets {CIFAR10,CIFAR100}] [--models {resnet18,}]\
+                              [--bs {1,4,16,64,256,1024}] [--epochs EPOCHS] [--lr LR]\
+                              [--sp shuffle_percentage] [--rp recording_point]
 
 .
 
@@ -47,5 +49,7 @@ optional arguments:
                         batch_size
   --epochs EPOCHS       epochs of training
   --lr LR               learning rate
+  --sp                  percentage of training samples to have shuffled labels
+  --rp                  float between [0, 1] to specify beginning of loss recording at epoch: rp * optimum_epochs
 
 ```

@@ -10,7 +10,7 @@ import os
 import json
 from os import path
 from torch.utils.data import DataLoader, Subset
-from const import EVAL_INTERVAL
+from const import PATIENCE_EPOCH
 # from config import Config
 
 class ShuffledDataset():
@@ -97,7 +97,7 @@ def eval(model, test_dataloader, device):
     return match_count / total_count
 
 
-def train(model, epoch, train_dataset, test_dataloader, device, args):
+def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
     """
     Input:
     model
@@ -111,11 +111,20 @@ def train(model, epoch, train_dataset, test_dataloader, device, args):
     device
         string of either 'cuda' or 'cpu'
     """
+    if pretrain:
+        print("Pretraining Begins")
+    else:
+        print("Noise Detection Begins")
 
     # Important! Set the reduction to be None which allows single sample loss recording
     criterion = nn.CrossEntropyLoss(reduction='none')
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    best_val_acc = 0
+    patience = 0
+    if not pretrain:
+        loss_record = torch.zeros(len(train_dataset)).to(device)
+    
     for e in range(epoch):
         model.train()
 
@@ -128,11 +137,19 @@ def train(model, epoch, train_dataset, test_dataloader, device, args):
 
         with tqdm.tqdm(total=len(dataloader)*batch_size, unit='it', unit_scale=True, unit_divisor=1000) as pbar:
             sum_acc = 0
-            for step, (X, y) in enumerate(dataloader):
+            total = 0
+            for X, y in dataloader:
                 X, y = X.to(device), y.to(device)
                 opt.zero_grad()
                 logits = model(X)
                 loss_list = criterion(logits, y)
+
+                # Begin loss recording at the assigned epoch
+                if not pretrain and e >= epoch * args.recording_point:
+                    sample_indices = feed_indices[total : total + X.shape[0]]
+                    for idx, i in enumerate(sample_indices):
+                        loss_record[i] += loss_list[idx]
+
                 acc = torch.sum(torch.argmax(logits, dim=1) == y).item()
                 loss_reduced = torch.mean(loss_list)
                 loss_reduced.backward()
@@ -142,13 +159,27 @@ def train(model, epoch, train_dataset, test_dataloader, device, args):
                 train_loss += loss_reduced.item()
                 pbar.update(batch_size)
                 sum_acc += acc
+                total += X.shape[0]
                 pbar.set_postfix(loss=loss_reduced.item(),
-                                     acc=sum_acc/((step+1)))
-        print("Epoch {} - Training loss: {}".format(e, train_loss/len(dataloader)))
-        if (1 + e) % EVAL_INTERVAL == 0:
-            validation_accuracy = eval(model, test_dataloader, device)
-            print(f"Test accuracy at epoch {e}: {validation_accuracy:.4f}")
-    print("Training Finished...")
+                                     acc=sum_acc / total)
+        
+        validation_accuracy = eval(model, test_dataloader, device)
+        print("Epoch {} - Training loss: {:.4f}, Validation Accuracy: {:.4f}".format(e, train_loss/len(dataloader), validation_accuracy))
+
+        # Early stopping
+        if validation_accuracy > best_val_acc:
+            best_val_acc = validation_accuracy
+        else:
+            patience += 1
+            if patience > PATIENCE_EPOCH:
+                print("Training early stops at epoch {}".format(e))
+                return e if pretrain else loss_record
+
+    if pretrain:
+        print("Pretrain finished for total {} epochs".format(e))
+    else:
+        print("Noise detection training finished, returning loss recording...")
+    return epoch if pretrain else loss_record
 
 
 

@@ -30,12 +30,22 @@ def main():
     #TODO: scheduler
     test_loader = DataLoader(cifar10_test_data, args.batch_size, shuffle=False)
     
-    # Import resnet18 pretrained model
+    # Pretrain to get the minimum epochs for model to converge
     model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
+    finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args)
+    
+    # Begin noise detection
+    model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
+    loss_recording = train(model, finish_epochs, False, train_dataset, test_loader, device, args)
 
-    train(model, args.epochs, train_dataset, test_loader, device, args)
-    accuracy = eval(model, test_loader, device)
-    print(accuracy)
+    # Report the noise detection results
+    changed_indices = train_dataset.get_shuffle_mapping().keys()
+    pred_indices = [t[1] for t in sorted(zip(loss_recording, range(len(train_dataset))), reverse=True, key=lambda x: x[0])[:len(changed_indices)]]
+    noise_detected = list(set(changed_indices) & set(pred_indices))
+    print("The model detected {} wrongly labeled training samples out of {} total samples".format(len(noise_detected), len(changed_indices)))
+
+    # accuracy = eval(model, test_loader, device)
+    # print(accuracy)
 
 if __name__ == '__main__':
     main()

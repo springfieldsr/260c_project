@@ -21,5 +21,8 @@ def Options():
     parser.add_argument('--sp',dest='shuffle_percentage',
                     default=0.05,type=float,
                     help='percentage of training sample to shuffle labels')
+    parser.add_argument('--rp',dest='recording_point',
+                    default=0.8,type=float,
+                    help='begin loss recoding at rp * optimal_total_epochs')
     args = parser.parse_args()
     return args

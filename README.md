@@ -43,13 +43,14 @@ usage: NoisyDetection.py [-h] [--datasets {CIFAR10,CIFAR100}] [--models {resnet1
 
 optional arguments:
   -h, --help            show this help message and exit
-  --datasets {CIFAR10,CIFAR100}
-  --models {resnet18,}  datasets
+  --dataset {CIFAR10,CIFAR100}
+  --model {resnet18,}  datasets
   --bs {1,4,16,64,256,1024}
                         batch_size
   --epochs EPOCHS       epochs of training
   --lr LR               learning rate
-  --sp                  percentage of training samples to have shuffled labels
+  --k                   track top k percentage of samples with highest loss
   --rp                  float between [0, 1] to specify beginning of loss recording at epoch: rp * optimum_epochs
+  --ls                  wheter to shuffle labels of k percent of training samples
 
 ```

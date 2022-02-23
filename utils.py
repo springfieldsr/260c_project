@@ -187,22 +187,33 @@ def SaveEnvironment():
 
     pass
 
+
 def GenerateEnvironment(args):
     seeds = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
     result_dir = './results'
     if not path.isdir(result_dir):
         os.mkdir(result_dir)
-    expr_path = path.join(result_dir,seeds).replace("\\","/")
-    args_path = path.join(expr_path,'args.txt').replace("\\","/")
+    expr_path = path.join(result_dir, seeds).replace("\\","/")
+    args_path = path.join(expr_path, 'args.txt').replace("\\","/")
     os.mkdir(expr_path)
     print('Create enviornment at : {}'.format(expr_path))
-    with open(args_path,'w') as F:
+    with open(args_path, 'w') as F:
         DumpOptionsToFile(args, F)
+    return expr_path
 
-def DumpOptionsToFile(args,fp):
+
+def DumpOptionsToFile(args, fp):
     d = vars(args)
     for key,value in d.items():
         if type(value) == str:
-            fp.write('{} = "{}"\n'.format(key,value))
+            fp.write('{} = "{}"\n'.format(key, value))
         else:
-            fp.write('{} = {}\n'.format(key,value))
+            fp.write('{} = {}\n'.format(key, value))
+
+
+def DumpNoisesToFile(noise, dataset_name, dir):
+    dest = path.join(dir, dataset_name).replace("\\","/")
+    with open(dest, 'w') as f:
+        for n in noise:
+            f.write(str(n) + '\n')
+    return dest

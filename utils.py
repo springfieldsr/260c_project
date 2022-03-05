@@ -70,6 +70,13 @@ class ShuffledDataset():
     def __len__(self):
         return len(self.dataset)
 
+    def cleanse(self,remove_list):
+        mask = torch.ones(len(self.dataset), dtype=bool)
+        mask[remove_list] = False
+        self.dataset.data = self.dataset.data[mask] 
+        self.dataset.targets = (torch.tensor(self.dataset.targets)[mask]).tolist() 
+
+
 
 def eval(model, test_dataloader, device):
     """

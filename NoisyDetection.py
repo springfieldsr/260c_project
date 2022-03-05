@@ -49,6 +49,11 @@ def main():
     saved_dest = DumpNoisesToFile(pred_indices, args.dataset, expr_path)
     print("Indices of detected noises are saved to " + saved_dest)
 
+    # cleanse the dataset and retrain
+    model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
+    train_dataset.cleanse(pred_indices)
+    finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args)
+
 
 if __name__ == '__main__':
     main()

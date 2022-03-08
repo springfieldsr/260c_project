@@ -28,19 +28,19 @@ def main():
     
     # for base remove all pretrain stages
     # Pretrain to get the minimum epochs for model to converge
-    # model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
-    # finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args)
+    model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
+    finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args)
     
     # # Begin noise detection
-    # model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
-    # loss_recording = train(model, finish_epochs, False, train_dataset, test_loader, device, args)
+    model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
+    loss_recording = train(model, finish_epochs, False, train_dataset, test_loader, device, args)
     # Report the noise detection results
     training_size = len(train_dataset)
+    pred_indices = [t[1] for t in sorted(zip(loss_recording, range(len(train_dataset))), reverse=True, key=lambda x: x[0])[:int(training_size * args.top_k)]]
     if args.label_shuffle:
         changed_indices = train_dataset.get_shuffle_mapping().keys()
         # remove the code noise label
-        noise_detected = list(set(changed_indices))
-        pred_indices = noise_detected
+        noise_detected = list(set(changed_indices) & set(pred_indices))
         # noise_detected = list(set(changed_indices) & set(pred_indices))
         print("The model detected {} shuffled labele training samples out of {} total samples".format(len(noise_detected), len(changed_indices)))
     

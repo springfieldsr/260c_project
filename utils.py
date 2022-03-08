@@ -173,14 +173,14 @@ def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
         validation_accuracy = eval(model, test_dataloader, device)
         print("Epoch {} - Training loss: {:.4f}, Validation Accuracy: {:.4f}".format(e, train_loss/len(dataloader), validation_accuracy))
 
-        # disable  Early stopping
-        # if validation_accuracy > best_val_acc:
-        #     best_val_acc = validation_accuracy
-        # else:
-        #     patience += 1
-        #     if patience > PATIENCE_EPOCH:
-        #         print("Training early stops at epoch {}".format(e))
-        #         return e if pretrain else loss_record
+
+        if validation_accuracy > best_val_acc:
+            best_val_acc = validation_accuracy
+        else:
+            patience += 1
+            if patience > PATIENCE_EPOCH:
+                print("Training early stops at epoch {}".format(e))
+                return e if pretrain else loss_record
 
     if pretrain:
         print("Pretrain finished for total {} epochs".format(e))

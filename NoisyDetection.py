@@ -51,7 +51,7 @@ def main():
 
     # cleanse the dataset and retrain
     model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
-    train_dataset.cleanse(pred_indices)
+    train_dataset.cleanse(noise_detected)
     finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args)
 
 

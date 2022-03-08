@@ -87,7 +87,7 @@ def eval(model, test_dataloader, device):
         pytorch dataloader
     device
         string of either 'cuda' or 'cpu'
-    
+
     Return:
         float accuracy on the validation set
     """
@@ -126,12 +126,14 @@ def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
     # Important! Set the reduction to be None which allows single sample loss recording
     criterion = nn.CrossEntropyLoss(reduction='none')
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-
+    train_loss_list = []
+    validation_accuracy_list = []
     best_val_acc = 0
     patience = 0
     if not pretrain:
-        loss_record = torch.zeros(len(train_dataset)).to(device)
-    
+        recording_epoch = int(epoch * args.recording_point)
+        loss_record = torch.zeros((len(train_dataset),epoch - recording_epoch)).to(device)
+
     for e in range(epoch):
         model.train()
 
@@ -152,10 +154,10 @@ def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
                 loss_list = criterion(logits, y)
 
                 # Begin loss recording at the assigned epoch
-                if not pretrain and e >= epoch * args.recording_point:
+                if not pretrain and e >= recording_epoch:
                     sample_indices = feed_indices[total : total + X.shape[0]]
                     for idx, i in enumerate(sample_indices):
-                        loss_record[i] += loss_list[idx]
+                        loss_record[i,e - recording_epoch] += loss_list[idx]
 
                 acc = torch.sum(torch.argmax(logits, dim=1) == y).item()
                 loss_reduced = torch.mean(loss_list)
@@ -172,16 +174,19 @@ def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
         
         validation_accuracy = eval(model, test_dataloader, device)
         print("Epoch {} - Training loss: {:.4f}, Validation Accuracy: {:.4f}".format(e, train_loss/len(dataloader), validation_accuracy))
-
+        train_loss_list.append(train_loss/len(dataloader))
+        validation_accuracy_list.append(validation_accuracy.item())
+        DumpResultToFile(train_loss_list,validation_accuracy_list)
         # Early stopping
-        if validation_accuracy > best_val_acc:
-            best_val_acc = validation_accuracy
-        else:
-            patience += 1
-            if patience > PATIENCE_EPOCH:
-                print("Training early stops at epoch {}".format(e))
-                return e if pretrain else loss_record
-
+        if pretrain: # only used pretrain on eraly stop.
+            if validation_accuracy > best_val_acc:
+                best_val_acc = validation_accuracy
+            else:
+                patience += 1
+                if patience > PATIENCE_EPOCH:
+                    print("Training early stops at epoch {}".format(e))
+                    return e if pretrain else loss_record
+    SaveEnvironment
     if pretrain:
         print("Pretrain finished for total {} epochs".format(e))
     else:
@@ -194,9 +199,9 @@ def SaveEnvironment():
 
     pass
 
-
+seeds = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 def GenerateEnvironment(args):
-    seeds = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    global seeds
     result_dir = './results'
     if not path.isdir(result_dir):
         os.mkdir(result_dir)
@@ -205,18 +210,42 @@ def GenerateEnvironment(args):
     os.mkdir(expr_path)
     print('Create enviornment at : {}'.format(expr_path))
     with open(args_path, 'w') as F:
-        DumpOptionsToFile(args, F)
+        DumpOptionsToFile(vars(args), F)
     return expr_path
 
 
 def DumpOptionsToFile(args, fp):
-    d = vars(args)
+    d = args
     for key,value in d.items():
         if type(value) == str:
             fp.write('{} = "{}"\n'.format(key, value))
         else:
             fp.write('{} = {}\n'.format(key, value))
 
+def DumpResultToFile(train_loss_list, validation_accuracy_list):
+    global seeds
+    result_dir = './results'
+    if not path.isdir(result_dir):
+        os.mkdir(result_dir)
+    expr_path = path.join(result_dir, seeds).replace("\\","/")
+    results_path = path.join(expr_path, 'results_path.txt').replace("\\","/")
+    # print('train_loss_list',train_loss_list)
+    # print('validation_accuracy_list',validation_accuracy_list)
+    with open(results_path, 'w') as F:
+        DumpOptionsToFile({
+            "train_loss_list":train_loss_list,
+            "validation_accuracy_list":validation_accuracy_list,
+        }, F)
+
+def DumpTagToFile(args,fname):
+    global seeds
+    result_dir = './results'
+    if not path.isdir(result_dir):
+        os.mkdir(result_dir)
+    expr_path = path.join(result_dir, seeds).replace("\\","/")
+    results_path = path.join(expr_path, fname).replace("\\","/")
+    with open(results_path, 'w') as F:
+        DumpOptionsToFile(args, F)
 
 def DumpNoisesToFile(noise, dataset_name, dir):
     dest = path.join(dir, dataset_name).replace("\\","/")

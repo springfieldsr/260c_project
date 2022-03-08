@@ -16,16 +16,22 @@ def Options():
                     default=30,type=int,
                     help='epochs of training')
     parser.add_argument('--lr',dest='lr',
-                    default=1e-2,type=float,
+                    default=1e-4,type=float,
                     help='learning rate')
     parser.add_argument('--k',dest='top_k',
                     default=0.05,type=float,
-                    help='track top k percentage of samples with highest loss')
+                    help='k percentage of samples with highest loss')
+    parser.add_argument('--gk',dest='guess_top_k',
+                    default=0.05,type=float,
+                    help='guess top k percentage of samples with highest loss')
     parser.add_argument('--ls',dest='label_shuffle',
                     default=True,type=bool,
                     help='wheter to shuffle labels of k percent of training samples')
     parser.add_argument('--rp',dest='recording_point',
-                    default=0.8,type=float,
+                    default=0.2,type=float,
                     help='begin loss recoding at rp * optimal_total_epochs')
+    parser.add_argument('--lp',dest='loss_process_method',choices=const.LOSS_PROCESS_METHOD,
+                    default='Std',type=str,
+                    help='process for loss')
     args = parser.parse_args()
     return args

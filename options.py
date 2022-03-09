@@ -27,5 +27,8 @@ def Options():
     parser.add_argument('--rp',dest='recording_point',
                     default=0.8,type=float,
                     help='begin loss recoding at rp * optimal_total_epochs')
+    parser.add_argument('--nt',dest='noise_type',
+                    default='symmetric',type=str,
+                    help='noise type: symmetric/asymmetric')
     args = parser.parse_args()
     return args

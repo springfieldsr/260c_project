@@ -24,7 +24,7 @@ def main():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     #TODO: create dataset based on arg
-    train_dataset = ShuffledDataset(args.dataset, './data', args.top_k * args.label_shuffle, train=True, download=True, transform=train_transform)
+    train_dataset = ShuffledDataset(args.dataset, './data', args.top_k * args.label_shuffle, train=True, download=True, transform=train_transform, noise_type=args.noise_type)
     test_dataset = ShuffledDataset(args.dataset, './data', 0, train=False, transform=test_transform)
 
     #TODO: scheduler
@@ -36,7 +36,7 @@ def main():
     
     # Begin noise detection
     model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
-    loss_recording = train(model, finish_epochs, False, train_dataset, test_loader, device, args)
+    loss_recording = train(model, finish_epochs, False, train_dataset, test_loader, device, args, earlyStop=False)
 
     # Report the noise detection results
     training_size = len(train_dataset)
@@ -52,7 +52,7 @@ def main():
     # cleanse the dataset and retrain
     model = torch.hub.load('pytorch/vision:v0.10.0', args.model, pretrained=False).to(device)
     train_dataset.cleanse(pred_indices)
-    finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args)
+    finish_epochs = train(model, args.epochs, True, train_dataset, test_loader, device, args, earlyStop=False)
 
 
 if __name__ == '__main__':

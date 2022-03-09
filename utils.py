@@ -1,4 +1,4 @@
-import random
+import random, copy
 import torch
 import torch.nn as nn
 import torchvision
@@ -11,10 +11,11 @@ import json
 from os import path
 from torch.utils.data import DataLoader, Subset
 from const import PATIENCE_EPOCH
+import numpy as np
 # from config import Config
 
 class ShuffledDataset():
-    def __init__(self, dataset_name, root, shuffle_percentage, transform=None, train=True, download=True):
+    def __init__(self, dataset_name, root, shuffle_percentage, transform=None, train=True, download=True, noise_type='symmetric'):
         """
         Input:
         dataset_name
@@ -42,8 +43,11 @@ class ShuffledDataset():
         # Force the test set to be intact
         percentage = train * shuffle_percentage
         dataset_len = len(self.dataset)
-        indices_to_shuffle = random.sample(range(dataset_len), int(percentage * dataset_len))
-        self._create_shuffle_mapping(indices_to_shuffle)
+        if noise_type=='asymmetric':
+            self._create_shuffle_mapping_asymmetric_cifar10(self.dataset.targets, percentage)
+        else: #uniform, symmetric noise
+            indices_to_shuffle = random.sample(range(dataset_len), int(percentage * dataset_len))
+            self._create_shuffle_mapping(indices_to_shuffle)
 
     def _create_shuffle_mapping(self, indices):
         """
@@ -58,6 +62,25 @@ class ShuffledDataset():
             label_range.remove(label)
             new_label = random.choice(label_range)
             self.mapping[index] = new_label
+
+    def _create_shuffle_mapping_asymmetric_cifar10(self, y_train, noise, random_state=None, nb_classes=10):
+        """mistakes:
+            flip in the symmetric way
+        """
+        self.mapping = {}
+        if noise == 0:
+            return
+        print("asymmetric shuffle")
+        source_class = [9, 2, 3, 5, 4]
+        target_class = [1, 0, 5, 3, 7]
+
+        for s, t in zip(source_class, target_class):
+            cls_idx = np.where(np.array(y_train) == s)[0]
+            n_noisy = int(noise * cls_idx.shape[0])
+            noisy_sample_index = np.random.choice(cls_idx, n_noisy, replace=False)
+            for idx in noisy_sample_index:
+                self.mapping[idx] = t
+        
 
     def __getitem__(self, index):
         sample, label = self.dataset[index]
@@ -75,6 +98,8 @@ class ShuffledDataset():
         mask[remove_list] = False
         self.dataset.data = self.dataset.data[mask] 
         self.dataset.targets = (torch.tensor(self.dataset.targets)[mask]).tolist() 
+        self.mapping = {}
+
 
 
 
@@ -104,7 +129,7 @@ def eval(model, test_dataloader, device):
     return match_count / total_count
 
 
-def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
+def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args, earlyStop=True):
     """
     Input:
     model
@@ -173,14 +198,15 @@ def train(model, epoch, pretrain, train_dataset, test_dataloader, device, args):
         validation_accuracy = eval(model, test_dataloader, device)
         print("Epoch {} - Training loss: {:.4f}, Validation Accuracy: {:.4f}".format(e, train_loss/len(dataloader), validation_accuracy))
 
-        # Early stopping
-        if validation_accuracy > best_val_acc:
-            best_val_acc = validation_accuracy
-        else:
-            patience += 1
-            if patience > PATIENCE_EPOCH:
-                print("Training early stops at epoch {}".format(e))
-                return e if pretrain else loss_record
+        if earlyStop:
+            # Early stopping
+            if validation_accuracy > best_val_acc:
+                best_val_acc = validation_accuracy
+            else:
+                patience += 1
+                if patience > PATIENCE_EPOCH:
+                    print("Training early stops at epoch {}".format(e))
+                    return e if pretrain else loss_record
 
     if pretrain:
         print("Pretrain finished for total {} epochs".format(e))
